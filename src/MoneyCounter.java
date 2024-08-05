@@ -2,8 +2,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
+
 
 public class MoneyCounter {
     private String folderPath;
@@ -18,11 +22,70 @@ public class MoneyCounter {
         this.folderPath = folderPath;
     }
 
-    public static void main(String[] args) {
-        // Using default path
-        MoneyCounter counter = new MoneyCounter();
-        counter.count();
+   
+
+    public void displayPath() {
+        System.out.println("Trenutni path: " + this.folderPath);
     }
+
+    public void setPath(String newPath) {
+        this.folderPath = newPath;
+    }
+
+    public void setDefaultPath() {
+        this.folderPath = "C:\\data";
+    }
+    
+    public void addToDatabase() {
+        // Initialize DatabaseOperations instance
+        DatabaseOperations dbOps = new DatabaseOperations("evolva_db.db");
+        
+        // Access the directory and list CSV files
+        File folder = new File(this.folderPath);
+        File[] listOfFiles = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".csv"));
+        
+        // Check if there are any CSV files
+        if (listOfFiles != null) {
+            for (File file : listOfFiles) {
+                processCsvFile(file, dbOps);
+            }
+        } else {
+            System.out.println("No CSV files found in the specified folder.");
+        }
+    }
+
+    // Method to process a single CSV file
+    private void processCsvFile(File file, DatabaseOperations dbOps) {
+        // Get the filename without the extension
+        String countryName = getFilenameWithoutExtension(file.getName());
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length == 3) {
+                    String cityName = parts[0].trim();
+                    String currencyName = parts[1].trim();
+                    double amount = Double.parseDouble(parts[2].trim());
+
+                    // Add the transaction to the database
+                    dbOps.addTransaction(cityName, countryName, currencyName, amount);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading CSV file: " + e.getMessage());
+        }
+    }
+
+    // Method to get the filename without the extension
+    private String getFilenameWithoutExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return fileName.substring(0, dotIndex);
+        }
+        return fileName; // No extension found
+    }
+
 
     public void count() {
         System.out.println("Searching for CSV files in \"" + this.folderPath + "\"");
@@ -77,7 +140,7 @@ public class MoneyCounter {
                 e.printStackTrace();
             }
 
-            System.out.println( "\"" + file.getName()+ "\" found: ");
+            System.out.println("\"" + file.getName() + "\" found: ");
             printSums(fileSums);
 
             // Add the file sums to the total sums
